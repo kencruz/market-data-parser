@@ -26,7 +26,7 @@ fn main() {
                                     // build the quote here
                                     let mut byte_string = s.chars();
                                     // the chunk lengths of the iterator we're grouping together,
-                                    // negative numbers means skip
+                                    // negative is the number of elements to skip
                                     let slice_instructions = vec![
                                         -5, 12, -12, 5, 7, 5, 7, 5, 7, 5, 7, 5, 7, -7, 5, 7, 5, 7,
                                         5, 7, 5, 7, 5, 7, -50, 8,
@@ -34,28 +34,10 @@ fn main() {
                                     let arr = consume(&mut byte_string, slice_instructions);
                                     let pkt_time = b.ts_sec;
                                     let issue_code = &arr[0];
-                                    let bid_price_1 = &arr[1].parse::<f32>().unwrap() / 100.0;
-                                    let bid_qty_1 = &arr[2].parse::<f32>().unwrap() / 100.0;
-                                    let bid_price_2 = &arr[3].parse::<f32>().unwrap() / 100.0;
-                                    let bid_qty_2 = &arr[4].parse::<f32>().unwrap() / 100.0;
-                                    let bid_price_3 = &arr[5].parse::<f32>().unwrap() / 100.0;
-                                    let bid_qty_3 = &arr[6].parse::<f32>().unwrap() / 100.0;
-                                    let bid_price_4 = &arr[7].parse::<f32>().unwrap() / 100.0;
-                                    let bid_qty_4 = &arr[8].parse::<f32>().unwrap() / 100.0;
-                                    let bid_price_5 = &arr[9].parse::<f32>().unwrap() / 100.0;
-                                    let bid_qty_5 = &arr[10].parse::<f32>().unwrap() / 100.0;
-                                    let ask_price_1 = &arr[11].parse::<f32>().unwrap() / 100.0;
-                                    let ask_qty_1 = &arr[12].parse::<f32>().unwrap() / 100.0;
-                                    let ask_price_2 = &arr[13].parse::<f32>().unwrap() / 100.0;
-                                    let ask_qty_2 = &arr[14].parse::<f32>().unwrap() / 100.0;
-                                    let ask_price_3 = &arr[15].parse::<f32>().unwrap() / 100.0;
-                                    let ask_qty_3 = &arr[16].parse::<f32>().unwrap() / 100.0;
-                                    let ask_price_4 = &arr[17].parse::<f32>().unwrap() / 100.0;
-                                    let ask_qty_4 = &arr[18].parse::<f32>().unwrap() / 100.0;
-                                    let ask_price_5 = &arr[19].parse::<f32>().unwrap() / 100.0;
-                                    let ask_qty_5 = &arr[20].parse::<f32>().unwrap() / 100.0;
+                                    let (bids, asks) = build_bidasks(&arr, 5, 1);
                                     let accept_time = &arr[21];
-                                    println!("{} {} {} {}@{} {}@{} {}@{} {}@{} {}@{} {}@{} {}@{} {}@{} {}@{} {}@{}", pkt_time, accept_time, issue_code, bid_qty_5, bid_price_5, bid_qty_4, bid_price_4, bid_qty_3, bid_price_3, bid_qty_2, bid_price_2, bid_qty_1, bid_price_1, ask_qty_1, ask_price_1, ask_qty_2, ask_price_2, ask_qty_3, ask_price_3, ask_qty_4, ask_price_4, ask_qty_5, ask_price_5);
+
+                                    println!("{} {} {} {}@{} {}@{} {}@{} {}@{} {}@{} {}@{} {}@{} {}@{} {}@{} {}@{}", pkt_time, accept_time, issue_code, bids[4].1, bids[4].0, bids[3].1, bids[3].0, bids[2].1, bids[2].0, bids[1].1, bids[1].0, bids[0].1, bids[0].0,  asks[0].1, asks[0].0, asks[1].1, asks[1].0, asks[2].1, asks[2].0, asks[2].1, asks[2].0, asks[4].1, asks[4].0);
                                 }
                                 Ok(_) => (),
                                 Err(_) => println!("not a quote"),
@@ -74,39 +56,6 @@ fn main() {
         }
     }
     println!("num_blocks: {}", num_blocks);
-}
-
-struct Quote<'a> {
-    pkt_time: u8,
-    data_type: &'a str,
-    info_type: &'a str,
-    market_type: &'a str,
-    accept_time: u8,
-    issue_code: u8,
-    issue_seq_no: u8,
-    market_status_type: u8,
-    total_bid_vol: u8,
-    total_ask_vol: u8,
-    bid_qty_1: u8,
-    bid_qty_2: u8,
-    bid_qty_3: u8,
-    bid_qty_4: u8,
-    bid_qty_5: u8,
-    bid_price_1: u8,
-    bid_price_2: u8,
-    bid_price_3: u8,
-    bid_price_4: u8,
-    bid_price_5: u8,
-    ask_qty_1: u8,
-    ask_qty_2: u8,
-    ask_qty_3: u8,
-    ask_qty_4: u8,
-    ask_qty_5: u8,
-    ask_price_1: u8,
-    ask_price_2: u8,
-    ask_price_3: u8,
-    ask_price_4: u8,
-    ask_price_5: u8,
 }
 
 fn consume(it: &mut Iterator<Item = char>, slices: Vec<i32>) -> Vec<String> {
@@ -131,4 +80,36 @@ fn consume(it: &mut Iterator<Item = char>, slices: Vec<i32>) -> Vec<String> {
         }
     }
     out
+}
+
+fn build_bidasks(v: &Vec<String>, n: u32, offset: usize) -> (Vec<(f32, f32)>, Vec<(f32, f32)>) {
+    let mut bids = vec![];
+    let mut asks = vec![];
+    let mut ptr = offset;
+
+    for _ in 0..n {
+        let bid_price = *&v[ptr].two_dec();
+        let bid_qty = *&v[ptr + 1].two_dec();
+        bids.push((bid_price, bid_qty));
+        ptr += 2;
+    }
+    for _ in 0..n {
+        let ask_price = *&v[ptr].two_dec();
+        let ask_qty = *&v[ptr + 1].two_dec();
+        asks.push((ask_price, ask_qty));
+        ptr += 2;
+    }
+
+    (bids, asks)
+}
+
+trait StockFormat {
+    fn two_dec(&self) -> f32;
+}
+
+// formats string to f32 with 2 decimal places
+impl StockFormat for str {
+    fn two_dec(&self) -> f32 {
+        self.parse::<f32>().unwrap() / 100.0
+    }
 }
