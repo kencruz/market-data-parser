@@ -37,7 +37,7 @@ fn main() {
                                     let (bids, asks) = build_bidasks(&arr, 5, 1);
                                     let accept_time = &arr[21];
 
-                                    println!("{} {} {} {}@{} {}@{} {}@{} {}@{} {}@{} {}@{} {}@{} {}@{} {}@{} {}@{}", pkt_time, accept_time, issue_code, bids[4].1, bids[4].0, bids[3].1, bids[3].0, bids[2].1, bids[2].0, bids[1].1, bids[1].0, bids[0].1, bids[0].0,  asks[0].1, asks[0].0, asks[1].1, asks[1].0, asks[2].1, asks[2].0, asks[2].1, asks[2].0, asks[4].1, asks[4].0);
+                                    println!("{} {} {} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2}", pkt_time, accept_time, issue_code, bids[4].1, bids[4].0, bids[3].1, bids[3].0, bids[2].1, bids[2].0, bids[1].1, bids[1].0, bids[0].1, bids[0].0,  asks[0].1, asks[0].0, asks[1].1, asks[1].0, asks[2].1, asks[2].0, asks[2].1, asks[2].0, asks[4].1, asks[4].0);
                                 }
                                 Ok(_) => (),
                                 Err(_) => println!("not a quote"),
@@ -58,7 +58,7 @@ fn main() {
     println!("num_blocks: {}", num_blocks);
 }
 
-fn consume(it: &mut Iterator<Item = char>, slices: Vec<i32>) -> Vec<String> {
+fn consume(it: &mut dyn Iterator<Item = char>, slices: Vec<i32>) -> Vec<String> {
     let mut out: Vec<String> = vec![];
     // this is N^2 time complexity...
     for n in slices {
