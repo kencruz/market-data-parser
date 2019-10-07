@@ -4,8 +4,10 @@ use pcap_parser::*;
 use std::fs::File;
 use std::path::Path;
 use std::str;
+use std::time::Instant;
 
 fn main() {
+    let now = Instant::now();
     let path: &Path = Path::new("./data/mdf-kospi200.20110216-0.pcap");
     let file = File::open(path).unwrap();
     let mut num_blocks = 0;
@@ -24,15 +26,13 @@ fn main() {
                             // filter out valid quotes
                             match str::from_utf8(&b.data[42..256]) {
                                 Ok(s) if s.starts_with("B6034") => {
-                                    // build the quote here
-                                    let mut byte_string = s.chars();
-                                    // the chunk lengths of the iterator we're grouping together,
-                                    // negative is the number of elements to skip
+                                    // the lengths of the slices we're grouping together,
+                                    // negative is the number of chars to skip
                                     let slice_instructions = vec![
                                         -5, 12, -12, 5, 7, 5, 7, 5, 7, 5, 7, 5, 7, -7, 5, 7, 5, 7,
                                         5, 7, 5, 7, 5, 7, -50, 8,
                                     ];
-                                    let arr = consume(&mut byte_string, slice_instructions);
+                                    let arr = consume(s, slice_instructions);
                                     let pkt_time = b.ts_sec as i64;
                                     let dt = Utc.timestamp(pkt_time, 0);
                                     let issue_code = &arr[0];
@@ -80,33 +80,25 @@ fn main() {
         }
     }
     println!("num_blocks: {}", num_blocks);
+    println!("finished at: {} seconds", now.elapsed().as_secs());
 }
 
-fn consume(it: &mut dyn Iterator<Item = char>, slices: Vec<i32>) -> Vec<String> {
-    let mut out: Vec<String> = vec![];
-    // this is N^2 time complexity...
+fn consume(s: &str, slices: Vec<i32>) -> Vec<&str> {
+    let mut out: Vec<&str> = vec![];
+    let mut ptr = 0 as usize;
     for n in slices {
+        let len = n.abs() as usize;
         if n < 0 {
-            let skip = n * -1;
-            let mut count = 0;
-            while count < skip {
-                it.next();
-                count += 1;
-            }
+            ptr += len;
         } else {
-            let mut count = 0;
-            let mut el: String = "".into();
-            while count < n {
-                el.push(it.next().unwrap());
-                count += 1;
-            }
-            out.push(el);
+            out.push(s.get(ptr..ptr + len).unwrap());
+            ptr += len;
         }
     }
     out
 }
 
-fn build_bidasks(v: &Vec<String>, n: u32, offset: usize) -> (Vec<(f32, f32)>, Vec<(f32, f32)>) {
+fn build_bidasks(v: &Vec<&str>, n: u32, offset: usize) -> (Vec<(f32, f32)>, Vec<(f32, f32)>) {
     let mut bids = vec![];
     let mut asks = vec![];
     let mut ptr = offset;
