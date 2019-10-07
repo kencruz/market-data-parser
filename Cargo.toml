@@ -6,3 +6,4 @@ edition = "2018"
 
 [dependencies]
 pcap-parser = "0.8.1"
+chrono = "0.4"

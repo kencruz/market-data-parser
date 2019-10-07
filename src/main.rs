@@ -1,3 +1,4 @@
+use chrono::{TimeZone, Utc, Duration};
 use pcap_parser::traits::PcapReaderIterator;
 use pcap_parser::*;
 use std::fs::File;
@@ -32,12 +33,35 @@ fn main() {
                                         5, 7, 5, 7, 5, 7, -50, 8,
                                     ];
                                     let arr = consume(&mut byte_string, slice_instructions);
-                                    let pkt_time = b.ts_sec;
+                                    let pkt_time = b.ts_sec as i64;
+                                    let dt = Utc.timestamp(pkt_time, 0);
                                     let issue_code = &arr[0];
                                     let (bids, asks) = build_bidasks(&arr, 5, 1);
-                                    let accept_time = &arr[21];
-
-                                    println!("{} {} {} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2}", pkt_time, accept_time, issue_code, bids[4].1, bids[4].0, bids[3].1, bids[3].0, bids[2].1, bids[2].0, bids[1].1, bids[1].0, bids[0].1, bids[0].0,  asks[0].1, asks[0].0, asks[1].1, asks[1].0, asks[2].1, asks[2].0, asks[2].1, asks[2].0, asks[4].1, asks[4].0);
+                                    let accept_time = accept_dt(&arr[21]);
+                                    println!("{} {} {} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2}",
+                                        dt.format("%Y-%m-%dT%H:%M:%S").to_string(),
+                                        accept_time.format("%Y-%m-%dT%H:%M:%S%.f").to_string(),
+                                        issue_code,
+                                        bids[4].1,
+                                        bids[4].0,
+                                        bids[3].1,
+                                        bids[3].0,
+                                        bids[2].1,
+                                        bids[2].0,
+                                        bids[1].1,
+                                        bids[1].0,
+                                        bids[0].1,
+                                        bids[0].0,
+                                        asks[0].1,
+                                        asks[0].0,
+                                        asks[1].1,
+                                        asks[1].0,
+                                        asks[2].1,
+                                        asks[2].0,
+                                        asks[3].1,
+                                        asks[3].0,
+                                        asks[4].1,
+                                        asks[4].0);
                                 }
                                 Ok(_) => (),
                                 Err(_) => println!("not a quote"),
@@ -112,4 +136,20 @@ impl StockFormat for str {
     fn two_dec(&self) -> f32 {
         self.parse::<f32>().unwrap() / 100.0
     }
+}
+
+fn accept_dt(a: &str) -> chrono::DateTime<chrono::offset::Utc> {
+    // convert time units to microseconds
+    let hour = a.chars().take(2).collect::<String>().parse::<i64>().unwrap() * 3_600_000_000;
+    let minute = a.chars().skip(2).take(2).collect::<String>().parse::<i64>().unwrap() * 60_000_000;
+    let second = a.chars().skip(4).take(2).collect::<String>().parse::<i64>().unwrap() * 1_000_000;
+    let microsecond = a.chars().skip(6).take(2).collect::<String>().parse::<i64>().unwrap();
+
+    let sum = hour + minute + second + microsecond;
+    let difference = sum - (3_600_000_000 * 9);
+
+    // using february 16, 2011 midnight as the base
+    let accept_base = Utc.timestamp(1297814400, 0);
+    let accept_time = Duration::microseconds(difference);
+    accept_base.checked_add_signed(accept_time).unwrap()
 }
