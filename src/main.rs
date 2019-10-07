@@ -40,7 +40,7 @@ fn main() {
                                     let accept_time = accept_dt(&arr[21]);
                                     println!("{} {} {} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2}",
                                         dt.format("%Y-%m-%dT%H:%M:%S").to_string(),
-                                        accept_time.format("%Y-%m-%dT%H:%M:%S%.f").to_string(),
+                                        accept_time.unwrap().format("%Y-%m-%dT%H:%M:%S%.f").to_string(),
                                         issue_code,
                                         bids[4].1,
                                         bids[4].0,
@@ -130,12 +130,12 @@ impl StockFormat for str {
     }
 }
 
-fn accept_dt(a: &str) -> chrono::DateTime<chrono::offset::Utc> {
+fn accept_dt(a: &str) -> Option<chrono::DateTime<chrono::offset::Utc>> {
     // convert time units to microseconds
-    let hour = a.chars().take(2).collect::<String>().parse::<i64>().unwrap() * 3_600_000_000;
-    let minute = a.chars().skip(2).take(2).collect::<String>().parse::<i64>().unwrap() * 60_000_000;
-    let second = a.chars().skip(4).take(2).collect::<String>().parse::<i64>().unwrap() * 1_000_000;
-    let microsecond = a.chars().skip(6).take(2).collect::<String>().parse::<i64>().unwrap();
+    let hour = a.get(0..2)?.parse::<i64>().ok()? * 3_600_000_000;
+    let minute = a.get(2..4)?.parse::<i64>().ok()? * 60_000_000;
+    let second = a.get(4..6)?.parse::<i64>().ok()? * 1_000_000;
+    let microsecond = a.get(6..8)?.parse::<i64>().ok()?;
 
     let sum = hour + minute + second + microsecond;
     let difference = sum - (3_600_000_000 * 9);
@@ -143,5 +143,5 @@ fn accept_dt(a: &str) -> chrono::DateTime<chrono::offset::Utc> {
     // using february 16, 2011 midnight as the base
     let accept_base = Utc.timestamp(1297814400, 0);
     let accept_time = Duration::microseconds(difference);
-    accept_base.checked_add_signed(accept_time).unwrap()
+    accept_base.checked_add_signed(accept_time)
 }
