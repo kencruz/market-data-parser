@@ -5,21 +5,23 @@ use std::fs::File;
 use std::path::Path;
 use std::str;
 use std::time::Instant;
+use std::env;
 
 fn main() {
     let now = Instant::now();
-    let path: &Path = Path::new("./data/mdf-kospi200.20110216-0.pcap");
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        panic!("Error: no file was specified");
+    }
+    let path: &Path = Path::new(&args[1]);
+
+
     let file = File::open(path).unwrap();
-    let mut num_blocks = 0;
     let mut reader = LegacyPcapReader::new(65536, file).expect("PcapReader");
     loop {
         match reader.next() {
             Ok((offset, block)) => {
-                num_blocks += 1;
                 match block {
-                    PcapBlockOwned::LegacyHeader(_hdr) => {
-                        // save hdr.network (linktype)
-                    }
                     PcapBlockOwned::Legacy(b) => {
                         // check if data length is long enough
                         if b.data.len() > 255 {
@@ -64,10 +66,11 @@ fn main() {
                                         asks[4].0);
                                 }
                                 Ok(_) => (),
-                                Err(_) => println!("not a quote"),
+                                Err(_) => (),
                             }
                         }
                     }
+                    PcapBlockOwned::LegacyHeader(_) => (),
                     PcapBlockOwned::NG(_) => unreachable!(),
                 }
                 reader.consume(offset);
@@ -79,7 +82,6 @@ fn main() {
             Err(e) => panic!("error while reading: {:?}", e),
         }
     }
-    println!("num_blocks: {}", num_blocks);
     println!("finished at: {} seconds", now.elapsed().as_secs());
 }
 
