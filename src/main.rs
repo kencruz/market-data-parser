@@ -1,11 +1,11 @@
-use chrono::{TimeZone, Utc, Duration};
+use chrono::{Duration, TimeZone, Utc};
 use pcap_parser::traits::PcapReaderIterator;
 use pcap_parser::*;
+use std::env;
 use std::fs::File;
 use std::path::Path;
 use std::str;
 use std::time::Instant;
-use std::env;
 
 fn main() {
     let now = Instant::now();
@@ -15,63 +15,20 @@ fn main() {
     }
     let path: &Path = Path::new(&args[1]);
 
-
     let file = File::open(path).unwrap();
     let mut reader = LegacyPcapReader::new(65536, file).expect("PcapReader");
+
     loop {
         match reader.next() {
             Ok((offset, block)) => {
                 match block {
                     PcapBlockOwned::Legacy(b) => {
-                        // check if data length is long enough
-                        if b.data.len() > 255 {
-                            // filter out valid quotes
-                            match str::from_utf8(&b.data[42..256]) {
-                                Ok(s) if s.starts_with("B6034") => {
-                                    // the lengths of the slices we're grouping together,
-                                    // negative is the number of chars to skip
-                                    let slice_instructions = vec![
-                                        -5, 12, -12, 5, 7, 5, 7, 5, 7, 5, 7, 5, 7, -7, 5, 7, 5, 7,
-                                        5, 7, 5, 7, 5, 7, -50, 8,
-                                    ];
-                                    let arr = consume(s, slice_instructions);
-                                    let pkt_time = b.ts_sec as i64;
-                                    let dt = Utc.timestamp(pkt_time, 0);
-                                    let issue_code = &arr[0];
-                                    let (bids, asks) = build_bidasks(&arr, 5, 1);
-                                    let accept_time = accept_dt(&arr[21]);
-                                    println!("{} {} {} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2}",
-                                        dt.format("%Y-%m-%dT%H:%M:%S").to_string(),
-                                        accept_time.unwrap().format("%Y-%m-%dT%H:%M:%S%.f").to_string(),
-                                        issue_code,
-                                        bids[4].1,
-                                        bids[4].0,
-                                        bids[3].1,
-                                        bids[3].0,
-                                        bids[2].1,
-                                        bids[2].0,
-                                        bids[1].1,
-                                        bids[1].0,
-                                        bids[0].1,
-                                        bids[0].0,
-                                        asks[0].1,
-                                        asks[0].0,
-                                        asks[1].1,
-                                        asks[1].0,
-                                        asks[2].1,
-                                        asks[2].0,
-                                        asks[3].1,
-                                        asks[3].0,
-                                        asks[4].1,
-                                        asks[4].0);
-                                }
-                                Ok(_) => (),
-                                Err(_) => (),
-                            }
+                        // filter for valid quotes
+                        if is_valid_quote(b.data) {
+                            build_quote(b.ts_sec, b.data);
                         }
                     }
-                    PcapBlockOwned::LegacyHeader(_) => (),
-                    PcapBlockOwned::NG(_) => unreachable!(),
+                    _ => (),
                 }
                 reader.consume(offset);
             }
@@ -85,7 +42,50 @@ fn main() {
     println!("finished at: {} seconds", now.elapsed().as_secs());
 }
 
-fn consume(s: &str, slices: Vec<i32>) -> Vec<&str> {
+fn is_valid_quote(b: &[u8]) -> bool {
+    return b.len() > 225 && &b[42..47] == [66, 54, 48, 51, 52];
+}
+
+fn build_quote(t: u32, b: &[u8]) {
+    let s = str::from_utf8(&b[42..256]).unwrap();
+    // the lengths of the slices we're grouping together,
+    // negative is the number of chars to skip
+    let slice_instructions = vec![
+        -5, 12, -12, 5, 7, 5, 7, 5, 7, 5, 7, 5, 7, -7, 5, 7, 5, 7, 5, 7, 5, 7, 5, 7, -50, 8,
+    ];
+    let arr = digest(s, slice_instructions);
+    let pkt_time = t as i64;
+    let dt = Utc.timestamp(pkt_time, 0);
+    let issue_code = &arr[0];
+    let (bids, asks) = build_bidasks(&arr, 5, 1);
+    let accept_time = accept_dt(&arr[21]);
+    println!("{} {} {} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2}",
+        dt.format("%Y-%m-%dT%H:%M:%S").to_string(),
+        accept_time.unwrap().format("%Y-%m-%dT%H:%M:%S%.f").to_string(),
+        issue_code,
+        bids[4].1,
+        bids[4].0,
+        bids[3].1,
+        bids[3].0,
+        bids[2].1,
+        bids[2].0,
+        bids[1].1,
+        bids[1].0,
+        bids[0].1,
+        bids[0].0,
+        asks[0].1,
+        asks[0].0,
+        asks[1].1,
+        asks[1].0,
+        asks[2].1,
+        asks[2].0,
+        asks[3].1,
+        asks[3].0,
+        asks[4].1,
+        asks[4].0);
+}
+
+fn digest(s: &str, slices: Vec<i32>) -> Vec<&str> {
     let mut out: Vec<&str> = vec![];
     let mut ptr = 0 as usize;
     for n in slices {
