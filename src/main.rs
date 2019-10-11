@@ -1,4 +1,4 @@
-use chrono::{Duration, TimeZone, Utc};
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use pcap_parser::traits::PcapReaderIterator;
 use pcap_parser::*;
 use std::env;
@@ -79,10 +79,18 @@ fn build_quote(t: u32, b: &[u8]) {
         asks[1].0,
         asks[2].1,
         asks[2].0,
-        asks[3].1,
+        asks[4].1,
         asks[3].0,
         asks[4].1,
         asks[4].0);
+}
+
+struct Quote<'a> {
+    pkt_time: DateTime<Utc>,
+    accept_time: DateTime<Utc>,
+    issue_code: &'a str,
+    bids: &'a[f32],
+    asks: &'a[f32],
 }
 
 fn digest(s: &str, slices: Vec<i32>) -> Vec<&str> {
