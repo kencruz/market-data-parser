@@ -1,6 +1,7 @@
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use pcap_parser::traits::PcapReaderIterator;
 use pcap_parser::*;
+use std::cmp::Ordering;
 use std::env;
 use std::fs::File;
 use std::path::Path;
@@ -17,7 +18,7 @@ fn main() {
 
     let file = File::open(path).unwrap();
     let mut reader = LegacyPcapReader::new(65536, file).expect("PcapReader");
-
+    let mut quote_pkts: Vec<(u32, Vec<u8>)> = Vec::new();
     loop {
         match reader.next() {
             Ok((offset, block)) => {
@@ -25,7 +26,8 @@ fn main() {
                     PcapBlockOwned::Legacy(b) => {
                         // filter for valid quotes
                         if is_valid_quote(b.data) {
-                            build_quote(b.ts_sec, b.data);
+                            let quote_pkt: Vec<u8> = b.data[42..256].iter().map(|x| *x).collect();
+                            quote_pkts.push((b.ts_sec, quote_pkt));
                         }
                     }
                     _ => (),
@@ -39,6 +41,15 @@ fn main() {
             Err(e) => panic!("error while reading: {:?}", e),
         }
     }
+
+    let mut quotes = quote_pkts
+        .iter()
+        .map(|(x, y)| build_quote(*x, y))
+        .collect::<Vec<Quote>>();
+    quotes.sort();
+    for q in quotes {
+        println!("{}", q.to_string());
+    }
     println!("finished at: {} seconds", now.elapsed().as_secs());
 }
 
@@ -46,52 +57,86 @@ fn is_valid_quote(b: &[u8]) -> bool {
     return b.len() > 225 && &b[42..47] == [66, 54, 48, 51, 52];
 }
 
-fn build_quote(t: u32, b: &[u8]) {
-    let s = str::from_utf8(&b[42..256]).unwrap();
+fn build_quote(t: u32, b: &[u8]) -> Quote {
+    let s = str::from_utf8(&b[..214]).unwrap();
     // the lengths of the slices we're grouping together,
     // negative is the number of chars to skip
     let slice_instructions = vec![
         -5, 12, -12, 5, 7, 5, 7, 5, 7, 5, 7, 5, 7, -7, 5, 7, 5, 7, 5, 7, 5, 7, 5, 7, -50, 8,
     ];
     let arr = digest(s, slice_instructions);
-    let pkt_time = t as i64;
-    let dt = Utc.timestamp(pkt_time, 0);
+    let pkt_time = Utc.timestamp(t as i64, 0);
     let issue_code = &arr[0];
     let (bids, asks) = build_bidasks(&arr, 5, 1);
-    let accept_time = accept_dt(&arr[21]);
-    println!("{} {} {} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2}",
-        dt.format("%Y-%m-%dT%H:%M:%S").to_string(),
-        accept_time.unwrap().format("%Y-%m-%dT%H:%M:%S%.f").to_string(),
+    let accept_time = accept_dt(&arr[21]).unwrap();
+    let quote = Quote {
+        pkt_time,
+        accept_time,
         issue_code,
-        bids[4].1,
-        bids[4].0,
-        bids[3].1,
-        bids[3].0,
-        bids[2].1,
-        bids[2].0,
-        bids[1].1,
-        bids[1].0,
-        bids[0].1,
-        bids[0].0,
-        asks[0].1,
-        asks[0].0,
-        asks[1].1,
-        asks[1].0,
-        asks[2].1,
-        asks[2].0,
-        asks[4].1,
-        asks[3].0,
-        asks[4].1,
-        asks[4].0);
+        bids,
+        asks,
+    };
+    quote
 }
 
 struct Quote<'a> {
     pkt_time: DateTime<Utc>,
-    accept_time: DateTime<Utc>,
+    accept_time: i64,
     issue_code: &'a str,
-    bids: &'a[f32],
-    asks: &'a[f32],
+    bids: Vec<(f32, f32)>,
+    asks: Vec<(f32, f32)>,
 }
+
+impl<'a> Quote<'a> {
+    pub fn to_string(&self) -> String {
+        let accept_dt_fmt = accept_fmt(&self.accept_time).unwrap();
+        format!("{} {} {} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2}",
+        self.pkt_time.format("%Y-%m-%dT%H:%M:%S").to_string(),
+        accept_dt_fmt.format("%Y-%m-%dT%H:%M:%S%.f").to_string(),
+        //self.accept_time,
+        self.issue_code,
+        self.bids[4].1,
+        self.bids[4].0,
+        self.bids[3].1,
+        self.bids[3].0,
+        self.bids[2].1,
+        self.bids[2].0,
+        self.bids[1].1,
+        self.bids[1].0,
+        self.bids[0].1,
+        self.bids[0].0,
+        self.asks[0].1,
+        self.asks[0].0,
+        self.asks[1].1,
+        self.asks[1].0,
+        self.asks[2].1,
+        self.asks[2].0,
+        self.asks[4].1,
+        self.asks[3].0,
+        self.asks[4].1,
+        self.asks[4].0)
+    }
+}
+
+impl<'a> Ord for Quote<'a> {
+    fn cmp(&self, other: &Quote) -> Ordering {
+        self.accept_time.cmp(&other.accept_time)
+    }
+}
+
+impl<'a> PartialOrd for Quote<'a> {
+    fn partial_cmp(&self, other: &Quote) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<'a> PartialEq for Quote<'a> {
+    fn eq(&self, other: &Quote) -> bool {
+        self.accept_time == other.accept_time
+    }
+}
+
+impl<'a> Eq for Quote<'a> {}
 
 fn digest(s: &str, slices: Vec<i32>) -> Vec<&str> {
     let mut out: Vec<&str> = vec![];
@@ -140,7 +185,7 @@ impl StockFormat for str {
     }
 }
 
-fn accept_dt(a: &str) -> Option<chrono::DateTime<chrono::offset::Utc>> {
+fn accept_dt(a: &str) -> Option<i64> {
     // convert time units to microseconds
     let hour = a.get(0..2)?.parse::<i64>().ok()? * 3_600_000_000;
     let minute = a.get(2..4)?.parse::<i64>().ok()? * 60_000_000;
@@ -150,8 +195,12 @@ fn accept_dt(a: &str) -> Option<chrono::DateTime<chrono::offset::Utc>> {
     let sum = hour + minute + second + microsecond;
     let difference = sum - (3_600_000_000 * 9);
 
+    Some(difference)
+}
+
+fn accept_fmt(a: &i64) -> Option<chrono::DateTime<chrono::offset::Utc>> {
     // using february 16, 2011 midnight as the base
     let accept_base = Utc.timestamp(1297814400, 0);
-    let accept_time = Duration::microseconds(difference);
+    let accept_time = Duration::microseconds(*a);
     accept_base.checked_add_signed(accept_time)
 }
