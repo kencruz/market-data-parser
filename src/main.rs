@@ -90,32 +90,29 @@ struct Quote<'a> {
 impl<'a> Quote<'a> {
     pub fn to_string(&self) -> String {
         let accept_dt_fmt = accept_fmt(&self.accept_time).unwrap();
-        format!("{} {} {} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2} {:.2}@{:.2}",
-        self.pkt_time.format("%Y-%m-%dT%H:%M:%S").to_string(),
-        accept_dt_fmt.format("%Y-%m-%dT%H:%M:%S%.f").to_string(),
-        //self.accept_time,
-        self.issue_code,
-        self.bids[4].1,
-        self.bids[4].0,
-        self.bids[3].1,
-        self.bids[3].0,
-        self.bids[2].1,
-        self.bids[2].0,
-        self.bids[1].1,
-        self.bids[1].0,
-        self.bids[0].1,
-        self.bids[0].0,
-        self.asks[0].1,
-        self.asks[0].0,
-        self.asks[1].1,
-        self.asks[1].0,
-        self.asks[2].1,
-        self.asks[2].0,
-        self.asks[4].1,
-        self.asks[3].0,
-        self.asks[4].1,
-        self.asks[4].0)
+        format!(
+            "{} {} {} {} {} {} {} {} {} {} {} {} {}",
+            self.pkt_time.format("%Y-%m-%dT%H:%M:%S").to_string(),
+            accept_dt_fmt.format("%Y-%m-%dT%H:%M:%S%.f").to_string(),
+            //self.accept_time,
+            self.issue_code,
+            qp_fmt(&self.bids[4]),
+            qp_fmt(&self.bids[3]),
+            qp_fmt(&self.bids[2]),
+            qp_fmt(&self.bids[1]),
+            qp_fmt(&self.bids[0]),
+            qp_fmt(&self.asks[0]),
+            qp_fmt(&self.asks[1]),
+            qp_fmt(&self.asks[2]),
+            qp_fmt(&self.asks[3]),
+            qp_fmt(&self.asks[4]),
+        )
     }
+}
+
+// convert to quantity@price string
+fn qp_fmt(s: &(f32, f32)) -> String {
+    format!("{:.2}@{:.2}", s.1, s.0)
 }
 
 impl<'a> Ord for Quote<'a> {
