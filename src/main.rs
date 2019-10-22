@@ -46,10 +46,13 @@ fn main() {
         .iter()
         .map(|(x, y)| build_quote(*x, y))
         .collect::<Vec<Quote>>();
+    
     quotes.sort();
+
     for q in quotes {
         println!("{}", q.to_string());
     }
+
     println!("finished at: {} seconds", now.elapsed().as_secs());
 }
 
@@ -69,14 +72,14 @@ fn build_quote(t: u32, b: &[u8]) -> Quote {
     let issue_code = &arr[0];
     let (bids, asks) = build_bidasks(&arr, 5, 1);
     let accept_time = accept_dt(&arr[21]).unwrap();
-    let quote = Quote {
+
+    Quote {
         pkt_time,
         accept_time,
         issue_code,
         bids,
         asks,
-    };
-    quote
+    }
 }
 
 struct Quote<'a> {
@@ -91,23 +94,21 @@ impl<'a> Quote<'a> {
     pub fn to_string(&self) -> String {
         let accept_dt_fmt = accept_fmt(&self.accept_time).unwrap();
         format!(
-            "{} {} {} {} {} {} {} {} {} {} {} {} {}",
+            "{} {} {} {} {}",
             self.pkt_time.format("%Y-%m-%dT%H:%M:%S").to_string(),
             accept_dt_fmt.format("%Y-%m-%dT%H:%M:%S%.f").to_string(),
-            //self.accept_time,
             self.issue_code,
-            qp_fmt(&self.bids[4]),
-            qp_fmt(&self.bids[3]),
-            qp_fmt(&self.bids[2]),
-            qp_fmt(&self.bids[1]),
-            qp_fmt(&self.bids[0]),
-            qp_fmt(&self.asks[0]),
-            qp_fmt(&self.asks[1]),
-            qp_fmt(&self.asks[2]),
-            qp_fmt(&self.asks[3]),
-            qp_fmt(&self.asks[4]),
+            qp_string(&self.bids),
+            qp_string(&self.asks),
         )
     }
+}
+
+fn qp_string<'a>(s: &'a [(f32, f32)]) -> String {
+    s.into_iter()
+        .map(|x| qp_fmt(x))
+        .collect::<Vec<String>>()
+        .join(" ")
 }
 
 // convert to quantity@price string
@@ -168,7 +169,7 @@ fn build_bidasks(v: &Vec<&str>, n: u32, offset: usize) -> (Vec<(f32, f32)>, Vec<
         ptr += 2;
     }
 
-    (bids, asks)
+    (bids.into_iter().rev().collect(), asks)
 }
 
 trait StockFormat {
