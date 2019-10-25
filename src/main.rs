@@ -1,36 +1,41 @@
 use chrono::{TimeZone, Utc};
-use pcap_parser::traits::PcapReaderIterator;
-use pcap_parser::*;
-use std::env;
-use std::fs::File;
-use std::path::Path;
-use std::str;
-use std::time::Instant;
 use getopts::Options;
+use pcap_parser::{traits::PcapReaderIterator, *};
+use std::{env, fs::File, path::Path, str, time::Instant};
 
 mod quote;
 
 use quote::Quote;
 
+fn print_usage(program: &str, opts: Options) {
+    let brief = format!("Usage: {} FILE [options]", program);
+    print!("{}", opts.usage(&brief));
+}
+
 fn main() {
     let now = Instant::now();
     let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        panic!("Error: no file was specified");
-    }
+
+    let program = args[0].clone();
 
     let mut opts = Options::new();
     opts.optflag("r", "", "sort quotes by accept time");
     let matches = match opts.parse(&args[1..]) {
-        Ok(m) => { m },
-        Err(f) => { panic!(f.to_string()) },
+        Ok(m) => m,
+        Err(f) => panic!(f.to_string()),
     };
 
-    let path: &Path = Path::new(&args[1]);
+    let path = if !matches.free.is_empty() {
+        Path::new(&matches.free[0])
+    } else {
+        print_usage(&program, opts);
+        return;
+    };
 
     let file = File::open(path).unwrap();
     let mut reader = LegacyPcapReader::new(65536, file).expect("PcapReader");
     let mut quote_pkts: Vec<(u32, Vec<u8>)> = Vec::new();
+
     loop {
         match reader.next() {
             Ok((offset, block)) => {
