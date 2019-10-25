@@ -6,6 +6,7 @@ use std::fs::File;
 use std::path::Path;
 use std::str;
 use std::time::Instant;
+use getopts::Options;
 
 mod quote;
 
@@ -17,6 +18,14 @@ fn main() {
     if args.len() < 2 {
         panic!("Error: no file was specified");
     }
+
+    let mut opts = Options::new();
+    opts.optflag("r", "", "sort quotes by accept time");
+    let matches = match opts.parse(&args[1..]) {
+        Ok(m) => { m },
+        Err(f) => { panic!(f.to_string()) },
+    };
+
     let path: &Path = Path::new(&args[1]);
 
     let file = File::open(path).unwrap();
@@ -50,7 +59,9 @@ fn main() {
         .map(|(x, y)| build_quote(*x, y))
         .collect::<Vec<Quote>>();
 
-    quotes.sort();
+    if matches.opt_present("r") {
+        quotes.sort();
+    }
 
     for q in quotes {
         println!("{}", q.to_string());
