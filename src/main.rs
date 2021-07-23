@@ -2,11 +2,11 @@ use getopts::Options;
 use pcap_parser::{traits::PcapReaderIterator, *};
 use std::{env, fs::File, path::Path, str, time::Instant};
 
-mod quote;
 mod helper;
+mod quote;
 
-use quote::Quote;
 use helper::*;
+use quote::Quote;
 
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} FILE [options]", program);
@@ -21,6 +21,7 @@ fn main() {
 
     let mut opts = Options::new();
     opts.optflag("r", "", "sort quotes by accept time");
+    opts.optflag("c", "csv", "csv compatible format");
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
         Err(f) => panic!(f.to_string()),
@@ -69,9 +70,21 @@ fn main() {
         quotes.sort();
     }
 
-    for q in quotes {
-        println!("{}", q.to_string());
+    if matches.opt_present("c") {
+        println!("Packet Time,Accept Time,Issue Code,BidQuantity@BidPrice 5th,BidQuantity@BidPrice 4th,BidQuantity@BidPrice 3rd,BidQuantity@BidPrice 2nd,BidQuantity@BidPrice 1st,AskQuantity@AskPrice 1st,AskQuantity@AskPrice 2nd,AskQuantity@AskPrice 3rd,AskQuantity@AskPrice 4th,AskQuantity@AskPrice 5th");
     }
 
-    println!("finished at: {} seconds", now.elapsed().as_secs());
+    if matches.opt_present("c") {
+        for q in quotes {
+            println!("{}", q.to_string(true));
+        }
+    } else {
+        for q in quotes {
+            println!("{}", q.to_string(false));
+        }
+    }
+
+    if !matches.opt_present("c") {
+        println!("finished at: {} seconds", now.elapsed().as_secs());
+    }
 }

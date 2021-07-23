@@ -10,20 +10,38 @@ pub struct Quote<'a> {
 }
 
 impl<'a> Quote<'a> {
-    pub fn to_string(&self) -> String {
+    pub fn to_string(&self, csv: bool) -> String {
         let accept_dt_fmt = accept_fmt(&self.accept_time).unwrap();
+        if csv {
+            return format!(
+                "{},{},{},{},{}",
+                self.pkt_time.format("%Y-%m-%dT%H:%M:%S").to_string(),
+                accept_dt_fmt.format("%Y-%m-%dT%H:%M:%S%.f").to_string(),
+                self.issue_code,
+                qp_string(&self.bids, true),
+                qp_string(&self.asks, true),
+            );
+        }
+
         format!(
             "{} {} {} {} {}",
             self.pkt_time.format("%Y-%m-%dT%H:%M:%S").to_string(),
             accept_dt_fmt.format("%Y-%m-%dT%H:%M:%S%.f").to_string(),
             self.issue_code,
-            qp_string(&self.bids),
-            qp_string(&self.asks),
+            qp_string(&self.bids, false),
+            qp_string(&self.asks, false),
         )
     }
 }
 
-fn qp_string<'a>(s: &'a [(f32, f32)]) -> String {
+fn qp_string<'a>(s: &'a [(f32, f32)], csv: bool) -> String {
+    if csv {
+        return s
+            .into_iter()
+            .map(|x| qp_fmt(x))
+            .collect::<Vec<String>>()
+            .join(",");
+    }
     s.into_iter()
         .map(|x| qp_fmt(x))
         .collect::<Vec<String>>()
