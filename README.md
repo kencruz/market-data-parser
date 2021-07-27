@@ -21,17 +21,14 @@ $ cargo run data/mdf-kospi200.20110216-0.pcap
 To sort by quote accept time:
 ```
 $ cargo run data/mdf-kospi200.20110216-0.pcap -r
-
 ```
 To display results in a csv file format
 ```
 $ cargo run data/mdf-kospi200.20110216-0.pcap -c
-
 ```
 To save csv results in a file named `output.csv`:
 ```
 $ cargo run data/mdf-kospi200.20110216-0.pcap -c > output.csv
-
 ```
 
 ## Dependencies
